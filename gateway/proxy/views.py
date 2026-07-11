@@ -49,7 +49,8 @@ def chat_gateway(request):
             request_body=request.data.get('messages'),
             response_body=None,
             latency_ms=0,
-            status="rate_limited"
+            status="rate_limited",
+            api_key=api_key_obj
         )
         return Response(
             {"error": "Rate limit exceeded. Try again shortly."},
@@ -74,16 +75,14 @@ def chat_gateway(request):
     is_sus, is_jailbreak = run_input_scans(messages)
 
 
-    
-    is_sus = prompt_inj.check_prompt(messages)
-    is_jailbreak= jailbreak_scan.check_jailbreak(messages)
 
     if is_sus or is_jailbreak:
         RequestLog.objects.create(
             request_body=messages,
             response_body=None,
             latency_ms=0,
-            status="blocked"
+            status="blocked",
+            api_key=api_key_obj
         )
         return Response(
             {"error": "Request blocked: potential prompt injection or jailbreak attempt detected."},
@@ -151,7 +150,8 @@ def chat_gateway(request):
             request_body=messages,
             response_body=None,
             latency_ms=elapsed_ms,
-            status="error"
+            status="error",
+            api_key=api_key_obj
         )
 
         return Response({'error': str(e)}, status = 500)
