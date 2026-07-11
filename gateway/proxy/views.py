@@ -22,7 +22,7 @@ client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
 #the features
 from . import prompt_inj, output_scan, jailbreak_scan
-
+from .about_costs import calculate_cost
 
 
 
@@ -34,7 +34,8 @@ def chat_gateway(request):
     Auth Check first
     '''
     provided_key = request.headers.get('X-API-Key')
-    if not provided_key or not APIKey.objects.filter(key=provided_key, is_active=True).exists():
+    api_key_obj = APIKey.objects.filter(key=provided_key, is_active=True).first()
+    if not api_key_obj:
         return Response({"error": "Invalid or missing API key."}, status=401)
 
 
@@ -97,12 +98,16 @@ def chat_gateway(request):
     try:
         #give it to open ai
         completion = client.chat.completions.create(
-            model = 'gpt-4o',
+            model = 'gpt-4o-mini',
             messages=messages
         )
 
         reply = completion.choices[0].message.content
         elapsed_ms = int((time.time() - start_time) * 1000)
+        prompt_tokens = completion.usage.prompt_tokens
+        completion_tokens = completion.usage.completion_tokens
+        cost = calculate_cost(prompt_tokens, completion_tokens)
+
 
         '''
         Scanning the output
@@ -115,6 +120,10 @@ def chat_gateway(request):
                 request_body=messages,
                 response_body={"reply": reply},
                 latency_ms=elapsed_ms,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                estimated_cost_usd=cost,
+                api_key=api_key_obj,
                 status="output_blocked"
             )
             return Response(
@@ -122,11 +131,14 @@ def chat_gateway(request):
                 status=502
             )
 
-    
         RequestLog.objects.create(
             request_body=messages,
             response_body={"reply": reply},
-            latency_ms=elapsed_ms,
+            latency_ms= elapsed_ms,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            estimated_cost_usd=cost,
+            api_key=api_key_obj,
             status="success"
         )
         return Response({"reply": reply})
