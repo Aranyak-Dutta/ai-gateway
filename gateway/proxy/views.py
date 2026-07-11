@@ -11,7 +11,7 @@ import time
 from openai import OpenAI
 
 #importing of models
-from .models import RequestLog
+from .models import RequestLog, APIKey
 
 #use OPENAI
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
@@ -25,7 +25,18 @@ from . import prompt_inj
 @ratelimit(key = 'ip', rate = '10/m', block = False)
 def chat_gateway(request):
 
-    #rate limited for ip and 10 requests per min
+    '''
+    Auth Check first
+    '''
+    provided_key = request.headers.get('X-API-Key')
+    if not provided_key or not APIKey.objects.filter(key=provided_key, is_active=True).exists():
+        return Response({"error": "Invalid or missing API key."}, status=401)
+
+
+
+    '''
+    Rate limited to 10 request per sec
+    '''
     was_limited = getattr(request, 'limited', False)
     if was_limited:
         RequestLog.objects.create(
@@ -41,6 +52,10 @@ def chat_gateway(request):
     messages = request.data.get('messages')
 
 
+    '''
+    Check for prompt injection
+    '''
+
     is_sus = prompt_inj.check_prompt(messages)
     if is_sus:
         RequestLog.objects.create(
@@ -53,6 +68,10 @@ def chat_gateway(request):
             {"error": f"Request blocked: potential prompt injection detected!."},
             status=400
         )
+    
+    '''
+    Transferring the prompt to openAi
+    '''
     start_time = time.time()
     try:
         #give it to open ai
