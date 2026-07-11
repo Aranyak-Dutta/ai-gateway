@@ -14,7 +14,7 @@ def check_prompt(messages) -> bool:
             user_content = message.get("content", "")
         
     if not user_content:
-        return False, 0.0
+        return False
         
 
     try:
@@ -27,6 +27,6 @@ def check_prompt(messages) -> bool:
 
     except Exception as e:
         print(f"API Error: {e}")
-        return False, 0.0
+        return False
 
 # Test it out

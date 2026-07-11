@@ -17,7 +17,8 @@ from .models import RequestLog, APIKey
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
 #the features
-from . import prompt_inj
+from . import prompt_inj, output_scan
+
 
 
 
@@ -79,18 +80,38 @@ def chat_gateway(request):
             model = 'gpt-4o',
             messages=messages
         )
+
         reply = completion.choices[0].message.content
         elapsed_ms = int((time.time() - start_time) * 1000)
-            
 
+        '''
+        Scanning the output
+        '''
+
+
+        is_unsafe = output_scan.check_output(reply)
+        if is_unsafe:
+            RequestLog.objects.create(
+                request_body=messages,
+                response_body={"reply": reply},
+                latency_ms=elapsed_ms,
+                status="output_blocked"
+            )
+            return Response(
+                {"error": "Response withheld: flagged content in AI output."},
+                status=502
+            )
+
+    
         RequestLog.objects.create(
-            request_body = messages,
-            response_body = {'reply': reply},
-            latency_ms = elapsed_ms,
-            status = 'success!'
+            request_body=messages,
+            response_body={"reply": reply},
+            latency_ms=elapsed_ms,
+            status="success"
         )
+        return Response({"reply": reply})
+        
 
-        return Response({'reply': reply})
         
     except Exception as e:
         elapsed_ms = int((time.time() - start_time) * 1000)
