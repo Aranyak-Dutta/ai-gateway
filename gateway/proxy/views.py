@@ -17,7 +17,7 @@ from .models import RequestLog, APIKey
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
 #the features
-from . import prompt_inj, output_scan
+from . import prompt_inj, output_scan, jailbreak_scan
 
 
 
@@ -54,11 +54,12 @@ def chat_gateway(request):
 
 
     '''
-    Check for prompt injection
+    Check for prompt injection and jailbreak
     '''
-
     is_sus = prompt_inj.check_prompt(messages)
-    if is_sus:
+    is_jailbreak= jailbreak_scan.check_jailbreak(messages)
+
+    if is_sus or is_jailbreak:
         RequestLog.objects.create(
             request_body=messages,
             response_body=None,
@@ -66,10 +67,11 @@ def chat_gateway(request):
             status="blocked"
         )
         return Response(
-            {"error": f"Request blocked: potential prompt injection detected!."},
+            {"error": "Request blocked: potential prompt injection or jailbreak attempt detected."},
             status=400
         )
     
+
     '''
     Transferring the prompt to openAi
     '''
