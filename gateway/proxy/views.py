@@ -1,6 +1,8 @@
 from django.shortcuts import render
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
+from django_ratelimit.decorators import ratelimit
+from django.utils.decorators import method_decorator
 
 
 #importing libraries/modules
@@ -20,8 +22,24 @@ from . import prompt_inj
 
 
 @api_view(['POST'])
-def call_it(request):
+@ratelimit(key = 'ip', rate = '10/m', block = False)
+def chat_gateway(request):
+
+    #rate limited for ip and 10 requests per min
+    was_limited = getattr(request, 'limited', False)
+    if was_limited:
+        RequestLog.objects.create(
+            request_body=request.data.get('messages'),
+            response_body=None,
+            latency_ms=0,
+            status="rate_limited"
+        )
+        return Response(
+            {"error": "Rate limit exceeded. Try again shortly."},
+            status=429
+    )
     messages = request.data.get('messages')
+
 
     is_sus = prompt_inj.check_prompt(messages)
     if is_sus:
