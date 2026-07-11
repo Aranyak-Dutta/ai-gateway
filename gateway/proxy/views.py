@@ -5,6 +5,10 @@ from django_ratelimit.decorators import ratelimit
 from django.utils.decorators import method_decorator
 
 
+#um, this is to make the models run simultaneously
+import concurrent.futures
+
+
 #importing libraries/modules
 import os
 import time
@@ -56,6 +60,20 @@ def chat_gateway(request):
     '''
     Check for prompt injection and jailbreak
     '''
+
+    def run_input_scans(messages):
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            injection_future = executor.submit(prompt_inj.check_prompt, messages)
+            jailbreak_future = executor.submit(jailbreak_scan.check_jailbreak, messages)
+
+            is_suspicious = injection_future.result()
+            is_jailbreak = jailbreak_future.result()
+            return is_suspicious, is_jailbreak
+
+    is_sus, is_jailbreak = run_input_scans(messages)
+
+
+    
     is_sus = prompt_inj.check_prompt(messages)
     is_jailbreak= jailbreak_scan.check_jailbreak(messages)
 
