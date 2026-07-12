@@ -23,7 +23,7 @@ client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 #the features
 from . import prompt_inj, output_scan, jailbreak_scan
 from .about_costs import calculate_cost
-
+from .providers import call_provider
 
 
 @api_view(['POST'])
@@ -37,6 +37,8 @@ def chat_gateway(request):
     api_key_obj = APIKey.objects.filter(key=provided_key, is_active=True).first()
     if not api_key_obj:
         return Response({"error": "Invalid or missing API key."}, status=401)
+
+
 
 
 
@@ -89,23 +91,22 @@ def chat_gateway(request):
             status=400
         )
     
+    provider_name = request.data.get('provider', 'gemini')
+    
+    
 
     '''
-    Transferring the prompt to openAi
+    Transferring the prompt
     '''
     start_time = time.time()
     try:
-        #give it to open ai
-        completion = client.chat.completions.create(
-            model = 'gpt-4o-mini',
-            messages=messages
-        )
+        result = call_provider(provider_name, messages)
+        reply = result["reply"]
 
-        reply = completion.choices[0].message.content
         elapsed_ms = int((time.time() - start_time) * 1000)
-        prompt_tokens = completion.usage.prompt_tokens
-        completion_tokens = completion.usage.completion_tokens
-        cost = calculate_cost(prompt_tokens, completion_tokens)
+        prompt_tokens = result["prompt_tokens"]
+        completion_tokens = result["completion_tokens"]
+        cost = calculate_cost(prompt_tokens, completion_tokens, provider_name)
 
 
         '''
@@ -122,6 +123,7 @@ def chat_gateway(request):
                 prompt_tokens=prompt_tokens,
                 completion_tokens=completion_tokens,
                 estimated_cost_usd=cost,
+                provider=provider_name,
                 api_key=api_key_obj,
                 status="output_blocked"
             )
@@ -137,6 +139,7 @@ def chat_gateway(request):
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
             estimated_cost_usd=cost,
+            provider=provider_name,
             api_key=api_key_obj,
             status="success"
         )
@@ -150,6 +153,7 @@ def chat_gateway(request):
             request_body=messages,
             response_body=None,
             latency_ms=elapsed_ms,
+            provider=provider_name,
             status="error",
             api_key=api_key_obj
         )

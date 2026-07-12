@@ -24,6 +24,7 @@ class APIKey(models.Model):
 #model to see the request log
 class RequestLog(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    provider = models.CharField(max_length=20, default="gemini")
     created_at = models.DateTimeField(auto_now_add=True)
     request_body = models.JSONField()
     response_body = models.JSONField(null = True, blank  = True)
@@ -31,12 +32,12 @@ class RequestLog(models.Model):
     #null for database allowance to accept null values of response
     #blank for validation with empty values
 
-    latency_ms = models.JSONField(null = True, blank= True)
+    latency_ms = models.IntegerField(null = True, blank= True)
     status = models.CharField(max_length=20, default="pending")
     prompt_tokens = models.IntegerField(null=True, blank=True)
     completion_tokens = models.IntegerField(null=True, blank=True)
     estimated_cost_usd = models.DecimalField(max_digits=10, decimal_places=6, null=True, blank=True)
-
+    
     api_key = models.ForeignKey(
         APIKey,
         on_delete=models.SET_NULL,
